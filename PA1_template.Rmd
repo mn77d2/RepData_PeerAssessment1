@@ -1,20 +1,112 @@
-# Reproducible Research: Peer Assessment 1
-
+# Reproducible Research Peer Assessment 1
+----------------
 
 ## Loading and preprocessing the data
-
-
+```{r}
+library(data.table)
+library(ggplot2)
+data<-fread("activity.csv")
+data$date<-as.Date(data$date)
+```
 
 ## What is mean total number of steps taken per day?
+### Make a histogram of the total number of steps taken each day
+```{r}
+dayTotal<-tapply(data$steps,data$date,function(x) sum(x,na.rm=TRUE))
+dt<-data.table(date=as.Date(rownames(dayTotal)),steps=dayTotal)
 
+g<-ggplot(dt,aes(x=steps))
+g<-g+geom_histogram()
+g<-g+scale_y_continuous(breaks=seq(0,10,2))
+plot(g)
+```
 
+### Calculate and report the mean and median total number of steps taken per day
+```{r}
+tapply(data$steps,data$date,function(x) mean(x,na.rm=TRUE))
+tapply(data$steps,data$date,function(x) median(x,na.rm=TRUE))
+```
 
 ## What is the average daily activity pattern?
 
+### Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+intervalTotal<-tapply(data$steps,data$interval,function(x) mean(x,na.rm=TRUE))
+dt<-data.table(interval=as.numeric(rownames(intervalTotal)),steps=intervalTotal)
 
+g<-ggplot(dt,aes(x=interval,y=steps))
+g<-g+geom_line()
+plot(g)
+```
+
+### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+dt$interval[dt$steps==max(dt$steps)]
+```
 
 ## Imputing missing values
+### Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+nrow(data[is.na(data$steps)])
+```
 
+### Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
 
+### Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+# the missing data are filled with the mean for that 5-minute interval
+data2<-data
+for(i in 1:nrow(data[is.na(data$steps)])){
+  
+  data2$steps[is.na(data$steps)][i]<-mean(data$steps[data$interval==data$interval[is.na(data$steps)][i]],na.rm=TRUE)
+
+}
+
+```
+
+### Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r}
+dayTotal<-tapply(data2$steps,data2$date,function(x) sum(x,na.rm=TRUE))
+dt<-data.table(date=as.Date(rownames(dayTotal)),steps=dayTotal)
+
+g<-ggplot(dt,aes(x=steps))
+g<-g+geom_histogram()
+g<-g+scale_y_continuous(breaks=seq(0,10,2))
+plot(g)
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+### Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+# "土曜日" means Saturday in Japanese  
+# "日曜日" means Sunday in Japanese
+weekdaysf<-sapply(weekdays(data2$date),function(x) if(x=="土曜日" | x=="日曜日"){"weekend"}else{"weekday"})
+data2=cbind(data2,weekday=as.factor(weekdaysf))
+```
+
+### Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r}
+# data table for weekday
+intervalTotal<-tapply(data2$steps[data2$weekday=="weekday"],data2$interval[data2$weekday=="weekday"],function(x) mean(x,na.rm=TRUE))
+intervalTotalw<-rep("weekday",nrow(intervalTotal))
+intervalTotal<-data.table(interval=as.numeric(rownames(intervalTotal)),steps=intervalTotal,weekday=intervalTotalw)
+
+# data table for weekend
+intervalTotal2<-tapply(data2$steps[data2$weekday=="weekend"],data2$interval[data2$weekday=="weekend"],function(x) mean(x,na.rm=TRUE))
+intervalTotalw2<-rep("weekend",nrow(intervalTotal2))
+intervalTotal2<-data.table(interval=as.numeric(rownames(intervalTotal2)),steps=intervalTotal2,weekday=intervalTotalw2)
+
+# rbind weekday and weekdend
+dt<-rbind(intervalTotal,intervalTotal2)
+
+# plot
+g<-ggplot(dt,aes(x=interval,y=steps))
+
+g<-g+facet_grid(weekday ~ .)
+g<-g+geom_line()
+plot(g)
+```
+
+
